@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Speed Cool Logistics — Real-Time Cargo Tracking</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet (Live Map) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Chart.js (Analytics) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+  <style>
+    /* Non-critical tiny tweaks beyond Tailwind */
+    .status-progress { height: 8px; border-radius: 4px; overflow: hidden; }
+    .tracking-dot { width: 14px; height: 14px; border-radius: 9999px; }
+    .tracking-detail-card {
+        background-color: #fff;
+        border-radius: 0.75rem; /* 12px */
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-sm */
+        padding: 1.5rem; /* p-6 */
+        margin-top: 1rem; /* mt-4 */
+    }
+    /* ensure leaflet map fills its container */
+    #liveMap { min-height: 420px; }
+    dialog::backdrop { background: rgba(2,6,23,0.4); }
+  </style>
+</head>
+<body class="antialiased text-slate-800 bg-slate-50">
+  <!-- Header / Nav -->
+  <header class="bg-white sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-4">
+        <a href="#home" class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-600 text-white grid place-content-center">
+            <i class="fa-solid fa-shipping-fast"></i>
+          </div>
+          <span class="text-2xl font-bold text-blue-700">Speed Cool Logistics</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-6 font-medium">
+          <a data-nav href="#home" class="hover:text-blue-600">Home</a>
+          <a data-nav href="#services" class="hover:text-blue-600">Services</a>
+          <a data-nav href="#tracking" class="hover:text-blue-600">Tracking</a>
+          <a data-nav href="#analytics" class="hover:text-blue-600">Analytics</a>
+          <a data-nav href="#operations" class="hover:text-blue-600">Operations</a>
+          <button id="openLogin" class="ml-2 px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Login</button>
+        </nav>
+        <button id="openMenu" class="md:hidden text-slate-700 text-2xl">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </div>
+    <!-- Mobile menu -->
+    <div id="mobileMenu" class="md:hidden hidden border-t bg-white">
+      <nav class="max-w-7xl mx-auto px-4 py-3 grid gap-3">
+        <a data-nav href="#home" class="py-2">Home</a>
+        <a data-nav href="#services" class="py-2">Services</a>
+        <a data-nav href="#tracking" class="py-2">Tracking</a>
+        <a data-nav href="#analytics" class="py-2">Analytics</a>
+        <a data-nav href="#operations" class="py-2">Resilience</a>
+        <button id="openLoginMobile" class="mt-2 px-4 py-2 rounded-xl bg-blue-600 text-white">Login</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section id="home" class="relative bg-gradient-to-r from-blue-900 to-blue-700 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
+      <div class="grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <h1 class="text-4xl lg:text-5xl font-extrabold leading-tight">Real-Time, End-to-End Cargo Tracking</h1>
+          <p class="mt-4 text-lg text-blue-100">Full transparency from pickup to delivery. Live maps, ETA predictions, and resilient infrastructure ready for route closures & cloud failover.</p>
+          <div class="mt-8 bg-white/95 rounded-2xl p-6 shadow-xl text-slate-800">
+            <h3 class="text-xl font-semibold mb-3">Track your cargo</h3>
+            <form id="quickTrack" class="grid sm:grid-cols-3 gap-3" autocomplete="off">
+              <input id="quickTrackInput" class="sm:col-span-2 px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Enter Tracking ID (e.g. SCL-123456)" required />
+              <button class="px-5 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Track Now</button>
+            </form>
+            <p class="mt-2 text-sm text-slate-500">
+              Try: <span class="font-semibold">SCL-DEMO123</span>, <span class="font-semibold">SCL-AIR456</span>, <span class="font-semibold">SCL-WARE789</span>.
+              Tracking IDs are generated upon successful booking, typically starting with "SCL-" followed by an 6–8 character alphanumeric code.
+            </p>
+            <p class="mt-2 text-xs text-slate-400">How to get a tracking ID: After you book a shipment in the Booking section, a tracking ID (format SCL-XXXXXX) will be generated and emailed to you. Use that ID in the box above or in the mobile app.</p>
+          </div>
+          <div class="mt-6 flex flex-wrap gap-3">
+            <a href="#booking" class="px-5 py-3 rounded-xl bg-blue-100 text-blue-800 hover:bg-blue-200">Book Shipment</a>
+            <a href="#tracking" class="px-5 py-3 rounded-xl bg-white/10 ring-1 ring-white/30 hover:bg-white/20">Live Tracking</a>
+          </div>
+        </div>
+        <div class="relative">
+          <div class="absolute -inset-6 bg-white/10 rounded-3xl blur"></div>
+          <div class="relative bg-white rounded-3xl shadow-2xl p-6">
+            <div class="aspect-[16/10] rounded-2xl overflow-hidden ring-1 ring-slate-200">
+              <!-- Decorative map placeholder -->
+              <img alt="logistics" class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=60" />
+            </div>
+            <div class="mt-4 grid grid-cols-3 gap-4 text-center">
+              <div class="p-3 rounded-xl bg-slate-50">
+                <div class="text-2xl font-bold text-slate-900">150+</div>
+                <div class="text-xs text-slate-500">Countries</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50">
+                <div class="text-2xl font-bold text-slate-900">99.99%</div>
+                <div class="text-xs text-slate-500">Uptime</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50">
+                <div class="text-2xl font-bold text-slate-900">Live</div>
+                <div class="text-xs text-slate-500">ETA & Alerts</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Services -->
+  <section id="services" class="py-16 lg:py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl lg:text-4xl font-bold">Our Services</h2>
+        <p class="mt-2 text-slate-600">Domestic & international freight, with transparent tracking at every hop, and resilient operations.</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="p-6 bg-slate-50 rounded-2xl ring-1 ring-slate-200">
+          <div class="w-12 h-12 grid place-content-center rounded-xl bg-blue-100 text-blue-700 mb-4"><i class="fa-solid fa-truck"></i></div>
+          <h3 class="font-semibold text-lg">Road & Rail Logistics</h3>
+          <p class="text-slate-600 mt-2">Optimized routes, live driver info, and detailed hub scans for ground transport. Adaptive to road closures.</p>
+        </div>
+        <div class="p-6 bg-slate-50 rounded-2xl ring-1 ring-slate-200">
+          <div class="w-12 h-12 grid place-content-center rounded-xl bg-green-100 text-green-700 mb-4"><i class="fa-solid fa-plane"></i></div>
+          <h3 class="font-semibold text-lg">Air Cargo & Re-routing</h3>
+          <p class="text-slate-600 mt-2">Flight legs with regulation-aware, real-time re-routing, dynamic ETAs, and airline details. Geo-aware planning.</p>
+        </div>
+        <div class="p-6 bg-slate-50 rounded-2xl ring-1 ring-slate-200">
+          <div class="w-12 h-12 grid place-content-center rounded-xl bg-purple-100 text-purple-700 mb-4"><i class="fa-solid fa-warehouse"></i></div>
+          <h3 class="font-semibold text-lg">Smart Warehousing</h3>
+          <p class="text-slate-600 mt-2">Precision inventory tracking, environmental logs, and chain-of-custody updates within our facilities.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tracking (Live Map + Status) -->
+  <section id="tracking" class="py-16 lg:py-20 bg-slate-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl lg:text-4xl font-bold">Live Cargo Tracking</h2>
+        <p class="mt-2 text-slate-600">Interactive map with pickup → transit → delivery status, updated in real-time, with detailed information.</p>
+      </div>
+      <div class="grid lg:grid-cols-3 gap-6 items-start">
+        <div class="lg:col-span-2 bg-white rounded-2xl ring-1 ring-slate-200 overflow-hidden">
+          <div id="liveMap" class="h-[420px] w-full"></div>
+        </div>
+        <div class="bg-white rounded-2xl ring-1 ring-slate-200 p-6">
+          <div class="flex items-center justify-between">
+            <h3 class="font-semibold text-lg">Shipment <span id="trackLabel" class="text-blue-700">SCL-DEMO123</span></h3>
+            <span id="statusPill" class="px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800">In Transit</span>
+          </div>
+          <div class="mt-4">
+            <div class="status-progress bg-slate-200">
+              <div id="progressFill" class="h-2 bg-gradient-to-r from-blue-600 to-emerald-500 w-1/4"></div>
+            </div>
+            <div class="grid grid-cols-5 text-[11px] text-slate-500 mt-2">
+              <span>Order Rec.</span><span>At Hub</span><span>In Transit</span><span>Out for Del.</span><span>Delivered</span>
+            </div>
+          </div>
+
+          <!-- Dynamic Detail Cards -->
+          <div id="currentTransitDetails" class="tracking-detail-card hidden">
+            <h4 class="font-medium text-slate-700 mb-2 flex items-center gap-2"><i class="fa-solid fa-route text-blue-500"></i> Current Transit Stage</h4>
+            <div id="transitInfo"></div>
+          </div>
+
+          <div id="airlineDetails" class="tracking-detail-card hidden">
+            <h4 class="font-medium text-slate-700 mb-2 flex items-center gap-2"><i class="fa-solid fa-plane-departure text-green-500"></i> Airline Details</h4>
+            <div id="airInfo"></div>
+          </div>
+
+          <div id="deliveryPersonDetails" class="tracking-detail-card hidden">
+            <h4 class="font-medium text-slate-700 mb-2 flex items-center gap-2"><i class="fa-solid fa-person-truck text-purple-500"></i> Delivery Driver</h4>
+            <div id="driverInfo"></div>
+          </div>
+
+          <ul id="history" class="mt-5 space-y-3 text-sm">
+            <!-- JS appends history items here -->
+          </ul>
+          <button id="rerouteBtn" class="mt-5 w-full px-4 py-2 rounded-xl bg-amber-100 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200">
+            <i class="fa-solid fa-triangle-exclamation mr-2"></i>Simulate Route Closure & Reroute (Air)
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Booking -->
+  <section id="booking" class="py-16 lg:py-20 bg-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-center mb-8">Book a Shipment</h2>
+      <form id="bookingForm" class="grid md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl ring-1 ring-slate-200">
+        <input id="pickup" class="px-4 py-3 rounded-xl border border-slate-300" placeholder="Pickup Location" required />
+        <input id="dropoff" class="px-4 py-3 rounded-xl border border-slate-300" placeholder="Drop-off Location" required />
+        <input id="date" type="date" class="px-4 py-3 rounded-xl border border-slate-300" required />
+        <select id="mode" class="px-4 py-3 rounded-xl border border-slate-300" required>
+          <option value="Air">Air Cargo</option>
+          <option value="Road">Road Freight</option>
+          <option value="Rail">Rail Cargo</option>
+          <option value="Sea">Sea Freight</option>
+        </select>
+        <div class="md:col-span-2">
+          <button class="w-full px-5 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Confirm Booking</button>
+        </div>
+      </form>
+      <p class="mt-6 text-center text-sm text-slate-600">Upon successful booking, you will receive a unique tracking ID (e.g., SCL-XYZ789) via email, which you can use for real-time tracking.</p>
+    </div>
+  </section>
+
+  <!-- Analytics -->
+  <section id="analytics" class="py-16 lg:py-20 bg-slate-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-center mb-8">Analytics Dashboard</h2>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl ring-1 ring-slate-200 p-6">
+          <h3 class="font-semibold mb-3">On-Time vs Delayed</h3>
+          <canvas id="onTimeChart" height="140"></canvas>
+        </div>
+        <div class="bg-white rounded-2xl ring-1 ring-slate-200 p-6">
+          <h3 class="font-semibold mb-3">Shipments by Mode</h3>
+          <canvas id="modeChart" height="140"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Resilience / System Status -->
+  <section id="operations" class="py-16 lg:py-20 bg-white">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-center mb-8">System Resilience & Geo-Awareness</h2>
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-blue-50 rounded-2xl ring-1 ring-blue-200 p-6">
+          <div class="flex items-start gap-3">
+            <i class="fa-solid fa-bolt text-blue-600 mt-1"></i>
+            <div>
+              <div class="font-semibold text-blue-900">Active Cloud Region</div>
+              <div id="activeRegion" class="text-blue-800">Primary (North America)</div>
+              <div id="failoverBanner" class="mt-2 hidden px-3 py-2 rounded-lg bg-amber-100 text-amber-900 ring-1 ring-amber-200">
+                <i class="fa-solid fa-cloud-bolt mr-2"></i>Primary region outage detected. Failover to <strong>Europe</strong> region active.
+              </div>
+            </div>
+          </div>
+          <div id="geoAlert" class="mt-4 px-3 py-2 rounded-lg bg-rose-50 text-rose-900 ring-1 ring-rose-200 hidden">
+            <i class="fa-solid fa-triangle-exclamation mr-2"></i>
+            <strong>ALERT:</strong> Due to new aviation regulations and geopolitical tensions, several international flight paths are suspended. Our system is dynamically re-routing all affected air cargo to ensure minimal delay.
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl ring-1 ring-slate-200 p-6">
+          <h3 class="font-semibold mb-3">System Controls</h3>
+          <button id="triggerFailover" class="w-full px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Simulate Cloud Failover</button>
+          <button id="triggerGeoAlert" class="w-full mt-3 px-4 py-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700">Simulate Geopolitical Airspace Closure</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="py-10 bg-slate-900 text-slate-300">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-3 gap-6 items-center">
+      <div class="text-sm">© <span id="year"></span> Speed Cool Logistics. All rights reserved.</div>
+      <div class="text-center text-sm">Built for transparency • Live maps • Multi-region</div>
+      <div class="md:text-right text-sm">Contact: support@speedcoollogistics.io</div>
+    </div>
+  </footer>
+
+  <!-- Login Modal -->
+  <dialog id="loginModal" class="rounded-2xl p-0 w-full max-w-md">
+    <form method="dialog" class="bg-white rounded-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <h3 class="font-semibold">Login</h3>
+        <button class="text-slate-500 hover:text-slate-700" value="close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="p-6 grid gap-3">
+        <input id="loginEmail" type="email" class="px-4 py-3 rounded-xl border border-slate-300" placeholder="Email" required />
+        <input id="loginPass" type="password" class="px-4 py-3 rounded-xl border border-slate-300" placeholder="Password" required />
+        <button id="loginBtn" class="mt-2 px-5 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Login</button>
+      </div>
+    </form>
+  </dialog>
+
+  
+
+  
+
+  <script>
+    // ===== Helpers =====
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+
+    // Active nav highlight on scroll & click
+    function setActiveLink() {
+      const ids = ["home","services","tracking","analytics","operations"];
+      let current = ids[0];
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top;
+        if (top <= 120) current = id; else break;
+      }
+      $$('a[data-nav]').forEach(a => a.classList.toggle('text-blue-600', a.getAttribute('href') === '#' + current));
+    }
+    window.addEventListener('scroll', setActiveLink);
+    window.addEventListener('load', setActiveLink);
+
+    // Mobile menu
+    $('#openMenu').addEventListener('click', ()=> $('#mobileMenu').classList.toggle('hidden'));
+    $('#openLogin')?.addEventListener('click', ()=> $('#loginModal').showModal());
+    $('#openLoginMobile')?.addEventListener('click', ()=> $('#loginModal').showModal());
+
+    // Footer year
+    $('#year').textContent = new Date().getFullYear();
+
+    // ===== Login (demo) =====
+    $('#loginBtn').addEventListener('click', (e)=>{
+      e.preventDefault();
+      const email = $('#loginEmail').value.trim();
+      const pass = $('#loginPass').value.trim();
+      if(email === 'demo@speedcool.com' && pass === 'password'){ // Simple demo login
+        alert('Login successful!');
+        $('#loginModal').close();
+      } else {
+        alert('Please enter valid credentials (demo@speedcool.com / password).');
+      }
+    });
+
+    // ===== Quick Track -> scroll to Live Tracking and set label =====
+    $('#quickTrack').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const id = $('#quickTrackInput').value.trim().toUpperCase();
+      if(!id) return;
+      loadTrackingData(id); // Load data for the entered ID
+      // switch to tracking section
+      window.location.hash = '#tracking';
+      setTimeout(()=>{ window.scrollBy(0,-80); }, 50);
+    });
+
+    // ===== Booking form (demo) =====
+    $('#bookingForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const pickup = $('#pickup').value, drop = $('#dropoff').value, date = $('#date').value, mode = $('#mode').value;
+      const newTrackingId = `SCL-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      alert(`Shipment booked from ${pickup} to ${drop} on ${date} via ${mode}. Your Tracking ID is: ${newTrackingId}`);
+      // Simulate adding this new ID to our demo data (not persistent)
+      demoShipments[newTrackingId] = {
+        route: [[getLatLngForPlace(pickup)[0], getLatLngForPlace(pickup)[1]], [getLatLngForPlace(drop)[0], getLatLngForPlace(drop)[1]]],
+        mode: mode,
+        status: 'Order Received',
+        progress: 0,
+        history: [{ timestamp: new Date().toLocaleString(), event: `Order received for shipment from ${pickup} to ${drop} via ${mode}.` }],
+        details: { currentTransit: { type: mode } },
+        currentPosition: getLatLngForPlace(pickup)
+      };
+      $('#quickTrackInput').value = newTrackingId; // Prefill for quick track
+    });
+
+    // Simple mock function to convert place names into lat/lng for demo bookings
+    function getLatLngForPlace(place) {
+      // In real system we'd geocode; here use some heuristics for demo:
+      const p = place.toLowerCase();
+      if (p.includes('mumbai')) return [19.0760, 72.8777];
+      if (p.includes('kolkata')) return [22.5726, 88.3639];
+      if (p.includes('delhi')) return [28.6139, 77.2090];
+      if (p.includes('bangalore')||p.includes('bengaluru')) return [12.9716, 77.5946];
+      if (p.includes('dubai')) return [25.276987, 55.296249];
+      if (p.includes('jaipur')) return [26.9124, 75.7873];
+      // fallback random-ish India coordinates
+      return [20.5937 + (Math.random()-0.5)*10, 78.9629 + (Math.random()-0.5)*15];
+    }
+
+    // ===== Leaflet Live Map Setup =====
+    const map = L.map('liveMap', { scrollWheelZoom: false }).setView([20.5937, 78.9629], 5); // India center
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+
+    // Icons for different modes/markers
+    const pickupIcon = L.icon({ iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+    const hubIcon = L.icon({ iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+    const destIcon = L.icon({ iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+    const movingIcon = L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }); // Default red
+
+    // Demo Data for various tracking IDs
+    const demoShipments = {
+      'SCL-DEMO123': {
+        route: [[19.0760, 72.8777], [22.5726, 88.3639], [28.6139, 77.2090]], // Mumbai -> Kolkata -> Delhi
+        mode: 'Road',
+        status: 'In Transit',
+        progress: 25,
+        history: [
+          { timestamp: '2024-04-20 10:00 AM', event: 'Order received and confirmed.' },
+          { timestamp: '2024-04-20 02:30 PM', event: 'Cargo picked up from Mumbai warehouse.' },
+          { timestamp: '2024-04-21 08:00 AM', event: 'Departed from Mumbai hub. Next stop: Kolkata.' },
+        ],
+        details: {
+          currentTransit: { type: 'Road', vehicle: 'Truck #TRK789', driver: 'Rahul Sharma', contact: '+91 9876543210', eta: '2024-04-22 04:00 PM' },
+        },
+        currentPosition: [19.0760, 72.8777], // Mumbai
+      },
+      'SCL-AIR456': {
+        route: [[12.9716, 77.5946], [28.7041, 77.1025], [34.0151, -118.4912]], // Bangalore -> Delhi -> Los Angeles (International Air)
+        mode: 'Air',
+        status: 'At Hub',
+        progress: 10,
+        history: [
+          { timestamp: '2024-04-19 09:00 AM', event: 'International Air Cargo order received.' },
+          { timestamp: '2024-04-19 03:00 PM', event: 'Cargo picked up from Bengaluru. Processed for air transport.' },
+          { timestamp: '2024-04-20 06:00 AM', event: 'Arrived at Delhi International Air Hub.' },
+        ],
+        details: {
+          currentTransit: { type: 'Air', nextLeg: 'Delhi to Los Angeles', eta: '2024-04-23 10:00 AM (PST)' },
+          airline: { name: 'Air India', flight: 'AI 175', status: 'Scheduled', departure: '2024-04-21 01:00 AM (IST)', arrival: '2024-04-23 06:00 AM (PST)' },
+          deliveryPerson: { name: 'N/A (air transit)', contact: 'N/A', profile: 'Handled by airline cargo team' }
+        },
+        currentPosition: [28.7041, 77.1025], // Delhi
+      },
+      'SCL-WARE789': {
+        route: [[25.276987, 55.296249], [25.276987, 55.296249]], // Dubai Warehouse (single point)
+        mode: 'Warehousing',
+        status: 'In Warehouse',
+        progress: 5,
+        history: [
+          { timestamp: '2024-04-18 11:00 AM', event: 'Order received for special storage.' },
+          { timestamp: '2024-04-18 04:00 PM', event: 'Cargo arrived at Dubai Smart Warehouse. Stored in Zone C, Bay 12.' },
+          { timestamp: '2024-04-19 09:00 AM', event: 'Temperature log updated: 22°C. Humidity: 45%.' },
+        ],
+        details: {
+          currentTransit: { type: 'Warehouse', location: 'Dubai Smart Warehouse', zone: 'Zone C', bay: 'Bay 12', status: 'Awaiting further instructions/dispatch.' },
+          deliveryPerson: { name: 'Warehouse Ops', contact: '+971 55 123 4567', profile: 'Warehouse manager - Ahmed' }
+        },
+        currentPosition: [25.276987, 55.296249], // Dubai
+      }
+    };
+
+    // State for animation
+    let animationId = null;
+    let routeLine = null;
+    let pickupMarker = null, hubMarker = null, destMarker = null, mover = null;
+    let currentRouteCoords = [];
+    let currentLeg = 0, currentT = 0;
+    let currentSpeed = 0.0045; // animation speed multiplier (adjustable)
+    let currentShipmentId = 'SCL-DEMO123';
+
+    // DOM refs
+    const historyList = $('#history');
+    const statusPill = $('#statusPill');
+    const progressFill = $('#progressFill');
+    const transitInfoDiv = $('#transitInfo');
+    const airlineInfoDiv = $('#airInfo');
+    const driverInfoDiv = $('#driverInfo');
+    const currentTransitDetailsCard = $('#currentTransitDetails');
+    const airlineDetailsCard = $('#airlineDetails');
+    const deliveryPersonDetailsCard = $('#deliveryPersonDetails');
+
+    // Utility: push history event
+    function pushHistory(text, isAlert=false) {
+      const li = document.createElement('li');
+      li.className = 'flex gap-3';
+      const dot = document.createElement('div');
+      dot.className = 'tracking-dot mt-1 ' + (isAlert ? 'bg-rose-500' : 'bg-slate-400');
+      dot.style.minWidth = '14px';
+      dot.style.minHeight = '14px';
+      const content = document.createElement('div');
+      content.innerHTML = `<div class="text-sm">${text}</div><div class="text-xs text-slate-400">${new Date().toLocaleString()}</div>`;
+      li.appendChild(dot);
+      li.appendChild(content);
+      historyList.prepend(li);
+    }
+
+    // Stop any running animation
+    function stopAnimation() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    }
+
+    // Start animation along currentRouteCoords (array of [lat,lng])
+    function startAnimation() {
+      stopAnimation();
+      if (!Array.isArray(currentRouteCoords) || currentRouteCoords.length === 0) return;
+      currentLeg = 0;
+      currentT = 0;
+
+      // create or update route polyline
+      if (routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline(currentRouteCoords, { color: '#2563eb', weight: 5, opacity: 0.9 }).addTo(map);
+
+      // remove existing markers
+      [pickupMarker, hubMarker, destMarker, mover].forEach(m => { if (m) map.removeLayer(m); });
+
+      // place markers for route points
+      if (currentRouteCoords.length >= 1) {
+        pickupMarker = L.marker(currentRouteCoords[0], { icon: pickupIcon }).addTo(map).bindPopup('Pickup');
+      }
+      if (currentRouteCoords.length >= 3) {
+        hubMarker = L.marker(currentRouteCoords[1], { icon: hubIcon }).addTo(map).bindPopup('Hub');
+        destMarker = L.marker(currentRouteCoords[currentRouteCoords.length-1], { icon: destIcon }).addTo(map).bindPopup('Destination');
+      } else if (currentRouteCoords.length === 2) {
+        // two points: pickup and dest
+        destMarker = L.marker(currentRouteCoords[1], { icon: destIcon }).addTo(map).bindPopup('Destination');
+      }
+
+      // moving marker starts at first point
+      mover = L.marker(currentRouteCoords[0], { icon: movingIcon }).addTo(map).bindPopup('In Transit');
+
+      // fit bounds
+      try {
+        map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
+      } catch (e) {
+        map.setView(currentRouteCoords[0], 6);
+      }
+
+      // animation tick
+      function tick() {
+        const legs = currentRouteCoords.length - 1;
+        if (legs <= 0) {
+          // stationary (warehouse)
+          progressFill.style.width = '5%';
+          statusPill.textContent = demoShipments[currentShipmentId].status || 'At Location';
+          stopAnimation();
+          return;
+        }
+
+        // move along current leg
+        const A = currentRouteCoords[currentLeg];
+        const B = currentRouteCoords[currentLeg+1];
+        currentT += currentSpeed;
+        if (currentT >= 1) {
+          // move to next leg
+          currentLeg++;
+          currentT = 0;
+          pushHistory(`Arrived at waypoint ${currentLeg} of ${legs}.`);
+          // if reached final
+          if (currentLeg >= legs) {
+            mover.setLatLng(currentRouteCoords[currentRouteCoords.length-1]);
+            progressFill.style.width = '100%';
+            statusPill.textContent = 'Delivered';
+            statusPill.className = 'px-3 py-1 text-sm rounded-full bg-emerald-100 text-emerald-800';
+            pushHistory('Delivered. Proof of delivery captured.');
+            stopAnimation();
+            return;
+          }
+        } else {
+          const pos = lerp(A, B, currentT);
+          mover.setLatLng(pos);
+          // update ETA/progress visually: compute fraction along entire route
+          const frac = (currentLeg + currentT) / legs;
+          progressFill.style.width = `${Math.round(frac*100)}%`;
+        }
+        animationId = requestAnimationFrame(tick);
+      }
+
+      animationId = requestAnimationFrame(tick);
+    }
+
+    // Load tracking data (main entrypoint for user to view a shipment)
+    function loadTrackingData(id) {
+      id = String(id).toUpperCase();
+      if (!demoShipments[id]) {
+        alert('Tracking ID not found in demo data. Try sample IDs: SCL-DEMO123, SCL-AIR456, SCL-WARE789.');
+        return;
+      }
+      currentShipmentId = id;
+      const s = demoShipments[id];
+
+      // Update label and status pill
+      $('#trackLabel').textContent = id;
+      statusPill.textContent = s.status || 'Unknown';
+      statusPill.className = 'px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800';
+      progressFill.style.width = (s.progress || 0) + '%';
+
+      // Populate history
+      historyList.innerHTML = '';
+      if (Array.isArray(s.history)) {
+        s.history.slice().reverse().forEach(h => {
+          pushHistory(`${h.event} — <span class="text-xs text-slate-400">${h.timestamp}</span>`);
+        });
+      }
+
+      // Show or hide cards based on data
+      if (s.details && s.details.currentTransit) {
+        currentTransitDetailsCard.classList.remove('hidden');
+        const ct = s.details.currentTransit;
+        transitInfoDiv.innerHTML = Object.entries(ct).map(([k,v])=>`<div><strong class="capitalize">${k}:</strong> ${v}</div>`).join('');
+      } else {
+        currentTransitDetailsCard.classList.add('hidden');
+        transitInfoDiv.innerHTML = '';
+      }
+
+      if (s.details && s.details.airline) {
+        airlineDetailsCard.classList.remove('hidden');
+        const a = s.details.airline;
+        airlineInfoDiv.innerHTML = `
+          <div><strong>Airline:</strong> ${a.name} (${a.flight || '-'})</div>
+          <div><strong>Status:</strong> ${a.status || '-'}</div>
+          <div><strong>Departure:</strong> ${a.departure || '-'}</div>
+          <div><strong>Arrival:</strong> ${a.arrival || '-'}</div>
+        `;
+      } else {
+        airlineDetailsCard.classList.add('hidden');
+        airlineInfoDiv.innerHTML = '';
+      }
+
+      if (s.details && s.details.currentTransit && s.details.currentTransit.driver) {
+        deliveryPersonDetailsCard.classList.remove('hidden');
+        const d = s.details.currentTransit;
+        driverInfoDiv.innerHTML = `
+          <div><strong>Name:</strong> ${d.driver || '-'} </div>
+          <div><strong>Contact:</strong> <a href="tel:${d.contact}">${d.contact || '-'}</a></div>
+          <div><strong>Vehicle:</strong> ${d.vehicle || '-'}</div>
+          <div class="mt-2 text-xs text-slate-500">Tap to call the delivery person for live status.</div>
+        `;
+      } else if (s.details && s.details.deliveryPerson) {
+        deliveryPersonDetailsCard.classList.remove('hidden');
+        const d = s.details.deliveryPerson;
+        driverInfoDiv.innerHTML = `
+          <div><strong>Name:</strong> ${d.name || '-'} </div>
+          <div><strong>Contact:</strong> <a href="tel:${d.contact}">${d.contact || '-'}</a></div>
+          <div><strong>Profile:</strong> ${d.profile || '-'}</div>
+        `;
+      } else {
+        deliveryPersonDetailsCard.classList.add('hidden');
+        driverInfoDiv.innerHTML = '';
+      }
+
+      // Setup route coords for animation
+      currentRouteCoords = Array.isArray(s.route) ? s.route.slice() : [];
+      // If route contains place-strings or lat/lng objects, ensure proper format — demo uses arrays already
+
+      // update map markers and start animation
+      startAnimation();
+    }
+
+    // initial load of default demo tracking id
+    loadTrackingData(currentShipmentId);
+
+    // Simulate route closure + dynamic reroute (for Air shipments)
+    $('#rerouteBtn').addEventListener('click', ()=>{
+      const s = demoShipments[currentShipmentId];
+      if (!s) return alert('No shipment loaded.');
+      if (s.mode !== 'Air') {
+        // For non-air, do a ground reroute via a waypoint (Jaipur example)
+        pushHistory('⚠ Route update: Ground reroute via Jaipur due to closure.');
+        const jaipur = [26.9124, 75.7873];
+        // Create new route from current mover position to jaipur to destination
+        const moverPos = mover ? [mover.getLatLng().lat, mover.getLatLng().lng] : currentRouteCoords[0];
+        const dest = currentRouteCoords[currentRouteCoords.length-1];
+        currentRouteCoords = [moverPos, jaipur, dest];
+        demoShipments[currentShipmentId].route = currentRouteCoords;
+        startAnimation();
+        return;
+      }
+
+      // For Air shipments, simulate airspace closure and reroute via alternative hub
+      pushHistory('⚠ Airspace closure detected. Re-routing air leg via alternate hub.');
+      $('#geoAlert').classList.remove('hidden');
+
+      // pick an alternate hub coordinate (for demo use Jaipur or Singapore depending on route)
+      const altHub = [26.9124, 75.7873]; // Jaipur as alternative for India flights (demo)
+      // get current mover position and destination
+      const moverPos = mover ? [mover.getLatLng().lat, mover.getLatLng().lng] : currentRouteCoords[0];
+      const dest = currentRouteCoords[currentRouteCoords.length-1];
+
+      // set new route: current -> altHub -> destination
+      currentRouteCoords = [moverPos, altHub, dest];
+      demoShipments[currentShipmentId].route = currentRouteCoords;
+
+      // update airline details to show reroute
+      if (!s.details) s.details = {};
+      if (!s.details.airline) s.details.airline = { name: 'Unknown', flight: '-', status: 'Rerouted' };
+      s.details.airline.status = 'Rerouted';
+      airlineInfoDiv.innerHTML = `
+          <div><strong>Airline:</strong> ${s.details.airline.name} (${s.details.airline.flight || '-'})</div>
+          <div><strong>Status:</strong> ${s.details.airline.status}</div>
+          <div><strong>Note:</strong> Rerouted via alternate hub. ETA updated.</div>
+      `;
+      airlineDetailsCard.classList.remove('hidden');
+
+      // slightly increase animation speed so demo completes faster
+      currentSpeed = 0.006;
+      startAnimation();
+    });
+
+    // ===== Resilience Controls =====
+    $('#triggerFailover').addEventListener('click', ()=>{
+      $('#activeRegion').textContent = 'Europe (Failover)';
+      $('#failoverBanner').classList.remove('hidden');
+      pushHistory('System notice: Primary cloud region outage detected. Failover to Europe region activated.', true);
+      alert('Failover simulated: traffic shifted to Europe region.');
+    });
+
+    $('#triggerGeoAlert').addEventListener('click', ()=>{
+      $('#geoAlert').classList.remove('hidden');
+      pushHistory('Breaking: Geopolitical airspace closure simulated. Affected air legs will be re-routed.', true);
+      // also visually mark air shipments by setting airline status 'Delayed' in demo data
+      Object.values(demoShipments).forEach(s => {
+        if (s.mode === 'Air' && s.details && s.details.airline) {
+          s.details.airline.status = 'Delayed (airspace closure)';
+        }
+      });
+      // If current is air, refresh the airline info
+      const current = demoShipments[currentShipmentId];
+      if (current && current.mode === 'Air' && current.details && current.details.airline) {
+        airlineInfoDiv.innerHTML = `
+          <div><strong>Airline:</strong> ${current.details.airline.name} (${current.details.airline.flight || '-'})</div>
+          <div><strong>Status:</strong> ${current.details.airline.status}</div>
+        `;
+        airlineDetailsCard.classList.remove('hidden');
+      }
+    });
+
+    // ===== Charts (analytics) =====
+    const onTimeCtx = document.getElementById('onTimeChart').getContext('2d');
+    new Chart(onTimeCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['On-Time','Delayed'],
+        datasets: [{ data: [92, 8], backgroundColor: ['#10B981', '#EF4444'] }]
+      },
+      options: { plugins: { legend: { position: 'bottom' } } }
+    });
+
+    const modeCtx = document.getElementById('modeChart').getContext('2d');
+    new Chart(modeCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Air','Road','Rail','Sea'],
+        datasets: [{ label: 'Shipments', data: [340, 520, 150, 210], backgroundColor: ['#3B82F6','#06B6D4','#A78BFA','#F59E0B'] }]
+      },
+      options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+    });
+
+    // small helper: expose a few sample IDs to user console for testing convenience
+    console.log('Demo tracking IDs available:', Object.keys(demoShipments));
+
+    // Utility: simple linear interpolation (safety checks included earlier)
+    function lerp(a, b, t) {
+      return [a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t];
+    }
+
+    // Keep nav active highlight up-to-date on load
+    setTimeout(setActiveLink, 500);
+  </script>
+</body>
+</html>
